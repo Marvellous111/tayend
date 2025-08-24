@@ -78,7 +78,7 @@ async def createTask(request: Request, body: TaskBody):
             "4": "thursday",
             "5": "friday",
             "6": "saturday",
-            "0": "day"
+            "7": "day"
         }
         task_data = {
           "_id": ObjectId(),
@@ -96,7 +96,7 @@ async def createTask(request: Request, body: TaskBody):
         task_minute = int(temp_task_minute)
         task_hour = int(temp_task_hour)
         weekday = int(body.weekday)
-        if weekday == 7:
+        if weekday >= 7:
             weekday = "*"
         if task_minute > 0:
             task_minute = f"*/{str(task_minute)}"
