@@ -70,6 +70,16 @@ async def createTask(request: Request, body: TaskBody):
         tasks_db = client["CronTasks"]
         tasks_collection = tasks_db.get_collection("tasks_collection")
         task_uuid = uuid4()
+        weekday_dict = {
+            "0": "sunday",
+            "1": "monday",
+            "2": "tuesday",
+            "3": "wednesday",
+            "4": "thursday",
+            "5": "friday",
+            "6": "saturday",
+            "0": "day"
+        }
         task_data = {
           "_id": ObjectId(),
           "title": str(body.title),
@@ -77,7 +87,7 @@ async def createTask(request: Request, body: TaskBody):
           "username": str(body.username),
           "prompt": str(body.prompt),
           "time": str(body.time),
-          "weekday": str(body.weekday),
+          "weekday": weekday_dict[str(body.weekday)],
           "actions_taken":[]
         }
         sendtask = await tasks_collection.insert_one(task_data)
@@ -88,7 +98,7 @@ async def createTask(request: Request, body: TaskBody):
         weekday = int(body.weekday)
         if weekday == 7:
             weekday = "*"
-        if task_minute >= 0:
+        if task_minute > 0:
             task_minute = f"*/{str(task_minute)}"
         print(f"{str(task_minute)} {str(task_hour)} * * {str(weekday)}")
         
