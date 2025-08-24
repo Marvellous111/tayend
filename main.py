@@ -50,7 +50,7 @@ async def postquery(request: Request, body: BodyQuery):
     plan = createplan(str(body.query))
     plan_run = runplan(plan, body.username)
     
-    output = plan_run.outputs.final_output
+    output = plan_run.outputs
     
     output_str = output.model_dump()
     print(f"Final plan_run output is: {output_str}")
@@ -96,7 +96,7 @@ async def createTask(request: Request, body: TaskBody):
         async def start_action():
             plan = createplan(str(body.prompt))
             plan_run = runplan(plan, body.username)
-            output = plan_run.outputs.final_output
+            output = plan_run.outputs
             print(output.model_dump_json(indent=2))
             
             
