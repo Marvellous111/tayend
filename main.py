@@ -13,8 +13,18 @@ import threading
 from uuid import uuid4
 from fastapi_crons import Crons, get_cron_router
 from sse_starlette.sse import EventSourceResponse
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 crons = Crons(app)
 
 app.include_router(get_cron_router())
