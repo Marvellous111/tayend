@@ -59,7 +59,6 @@ async def async_stream(plan: Plan, username: str):
     while True:
         # Use asyncio.to_thread to non-blockingly get from queue
         item = await asyncio.to_thread(queue.get)
-        print(f"Item is: {item}")
         if item is None:
             break
         yield item
@@ -87,7 +86,6 @@ async def postquery(request: Request, body: BodyQuery):
 @app.get("/postquery/stream/{username}")
 async def stream_query(username: str):
     plan = query_plan.get(username, [])  # Retrieve plan
-    print(f"plan is: {plan}")
     return StreamingResponse(
         async_stream(plan, username),
         media_type="text/event-stream",

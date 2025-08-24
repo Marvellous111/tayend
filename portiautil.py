@@ -19,28 +19,26 @@ clarifications_list = []
 queue = Queue()
 def on_step_start(plan: Plan, plan_run: PlanRun, step: Step) -> None:  # noqa: ARG001
   try:
-    queue.put(f"data: STEP_START::{step.task}")
+    queue.put(f"data: STEP_START::{step.task}\n\n")
   except Exception as e:
-    queue.put(f"data: Error::An error occurred before step start")
+    queue.put(f"data: Error::An error occurred before step start\n\n")
     queue.put(None)
 
 def on_step_end(plan: Plan, plan_run: PlanRun, step: Step, output) -> None:
   try:
-    queue.put(f"data: STEP_RESULT::{step.output if step.output else 'No output'}")
+    queue.put(f"data: STEP_RESULT::{step.output if step.output else 'No output'}\n\n")
   except Exception as e:
-    queue.put(f"data: Error::An error occurred after step end")
+    queue.put(f"data: Error::An error occurred after step end\n\n")
     queue.put(None)
 
 def on_plan_end(plan: Plan, plan_run: PlanRun, output) -> None:
-  
   try:
-    if plan_run.outputs:
-      final_output = plan_run.outputs
-      queue.put(f"data: ANSWER::{final_output.model_dump_json()}")
-      
+    final_output = plan_run.outputs
+    print(final_output)
+    queue.put(f"data: ANSWER::{final_output.model_dump_json()}\n\n")
     queue.put(None)  # signal completion
   except Exception as e:
-    queue.put(f"data: Error::An error occurred after plan end")
+    queue.put(f"data: Error::An error occurred after plan end\n\n")
     queue.put(None)
 
 class WebClarificationHandler(ClarificationHandler):
