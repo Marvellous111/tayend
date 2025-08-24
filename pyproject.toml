@@ -7,6 +7,8 @@ requires-python = ">=3.13"
 dependencies = [
     "fastapi-crons>=2.0.1",
     "fastapi[standard]>=0.116.1",
+    "mongoengine>=0.29.1",
     "portia-sdk-python[all]>=0.6.2",
+    "pymongo[srv]>=4.14.1",
     "sse-starlette>=3.0.2",
 ]
