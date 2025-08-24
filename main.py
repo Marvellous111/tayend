@@ -104,8 +104,8 @@ async def createTask(request: Request, body: TaskBody):
         
         @crons.cron(f"{str(task_minute)} {str(task_hour)} * * {str(weekday)}",name="task_actions", tags=["tasks"])
         async def start_action():
-            plan = createplan(str(body.prompt))
-            plan_run = runplan(plan, body.username)
+            plan = taskcreateplan(str(body.prompt))
+            plan_run = taskrunplan(plan, body.username)
             output = plan_run.outputs
             print(output.model_dump_json(indent=2))
             

@@ -115,10 +115,30 @@ portia = Portia(
   )
 )
 
+task_portia = Portia(
+  config=my_config,
+  tools=PortiaToolRegistry(my_config) + open_source_tool_registry,
+  # execution_hooks=ExecutionHooks(
+  #   before_step_execution=on_step_start, # type: ignore
+  #   after_step_execution=on_step_end, # type: ignore
+  #   after_plan_run=on_plan_end, # type: ignore
+  #   clarification_handler=WebClarificationHandler()
+  # )
+)
+
 def createplan(task: str) -> Plan:
   plan = portia.plan(str(task))
   return plan
 
 def runplan(plan: Plan, username: str) -> PlanRun:
   plan_run = portia.run_plan(plan, end_user=f"{username}")
+  return plan_run
+
+
+def taskcreateplan(task: str) -> Plan:
+  plan = task_portia.plan(str(task))
+  return plan
+
+def taskrunplan(plan: Plan, username: str) -> PlanRun:
+  plan_run = task_portia.run_plan(plan, end_user=f"{username}")
   return plan_run
