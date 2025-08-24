@@ -50,9 +50,9 @@ async def postquery(request: Request, body: BodyQuery):
     plan = createplan(str(body.query))
     plan_run = runplan(plan, body.username)
     
-    output = plan_run.outputs
+    output = plan_run.outputs.final_output
     
-    output_str = output.model_dump_json(indent=2)
+    output_str = output.model_dump()
     print(f"Final plan_run output is: {output_str}")
     return {
         "message": output_str
@@ -91,22 +91,25 @@ async def createTask(request: Request, body: TaskBody):
         if task_minute >= 0:
             task_minute = f"*/{str(task_minute)}"
         print(f"{str(task_minute)} {str(task_hour)} * * {str(weekday)}")
+        
         @crons.cron(f"{str(task_minute)} {str(task_hour)} * * {str(weekday)}",name="task_actions", tags=["tasks"])
         async def start_action():
             plan = createplan(str(body.prompt))
             plan_run = runplan(plan, body.username)
+            output = plan_run.outputs.final_output
+            print(output.model_dump_json(indent=2))
+            
+            
             task_action = await tasks_collection.find_one({ "plan_id": str(task_uuid) })
             if task_action is None:
                 raise HTTPException(status_code=500, detail="Task not found") 
             task_action["actions_taken"].push(plan_run.outputs.model_dump())
 
-        get_tasks = tasks_collection.find()
-        print(get_tasks)
+        get_tasks = tasks_collection.find({"username": str(body.username)})
         gotten_tasks = []
         async for task in get_tasks:
             gotten_tasks.append(task_helper(task))
-        print(gotten_tasks)
-        print(f"Task added with id: {sendtask.inserted_id}")
+        # print(f"Task added with id: {sendtask.inserted_id}")
         return { 
             "message": gotten_tasks
         }
