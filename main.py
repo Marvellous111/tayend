@@ -64,24 +64,33 @@ async def async_stream(plan: Plan, username: str):
         yield item
 
     plan_thread.join()
-
+query_plan = {}
 @app.post("/postquery/")
 async def postquery(request: Request, body: BodyQuery):
     print(body)
     """Stream the steps to the users"""
     plan = createplan(str(body.query))
+    query_plan[str(body.username)] = plan
     
-    return StreamingResponse(
-        async_stream(plan, body.username),
-        media_type="text/event-stream",
-        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
-    )
+    return {"message": "Started plan_run"}
+    # return StreamingResponse(
+    #     async_stream(plan, body.username),
+    #     media_type="text/event-stream",
+    #     headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
+    # )
     # output_str = output.model_dump()
     # print(f"Final plan_run output is: {output_str}")
     # return {
     #     "message": output_str
     # }
-
+@app.get("/postquery/stream/{username}")
+async def stream_query(username: str):
+    plan = query_plan.get(username, [])  # Retrieve plan
+    return StreamingResponse(
+        async_stream(plan, username),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
+    )
 
 ###We want to use this to save the task to a mongodb instance with the username right?
 ###Hence we can use the username to get the task from the database
