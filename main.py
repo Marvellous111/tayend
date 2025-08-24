@@ -43,20 +43,34 @@ So when clairfication occurs we can return a particular function for the client 
 
 """
 
+async def async_stream(plan: Plan, username: str):
+    plan_thread = threading.Thread(target=runplan, args=(plan, username))
+    plan_thread.start()
+    while True:
+        # Use asyncio.to_thread to non-blockingly get from queue
+        item = await asyncio.to_thread(queue.get)
+        if item is None:
+            break
+        yield item
+
+    plan_thread.join()
+
 @app.post("/postquery/")
 async def postquery(request: Request, body: BodyQuery):
     print(body)
     """Stream the steps to the users"""
     plan = createplan(str(body.query))
-    plan_run = runplan(plan, body.username)
     
-    output = plan_run.outputs
-    
-    output_str = output.model_dump()
-    print(f"Final plan_run output is: {output_str}")
-    return {
-        "message": output_str
-    }
+    return StreamingResponse(
+        async_stream(plan, body.username),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
+    )
+    # output_str = output.model_dump()
+    # print(f"Final plan_run output is: {output_str}")
+    # return {
+    #     "message": output_str
+    # }
 
 
 ###We want to use this to save the task to a mongodb instance with the username right?

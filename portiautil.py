@@ -16,37 +16,32 @@ import threading
 
 #In-memory store for the clarifications to save to the classifications handler
 clarifications_list = []
-
 queue = Queue()
-
 def on_step_start(plan: Plan, plan_run: PlanRun, step: Step) -> None:  # noqa: ARG001
-  info = {
-    "type": "PLAN",
-    "details": {
-      "step_status": "STEP_START",
-      "step_task": step.task
-    }
-  }
-  # queue.put({"event": "step_start", "data": json.dumps(info)})
+  try:
+    queue.put(f"data: STEP_START::{step.task}")
+  except Exception as e:
+    queue.put(f"data: Error::An error occurred before step start")
+    queue.put(None)
 
 def on_step_end(plan: Plan, plan_run: PlanRun, step: Step, output) -> None:
-  result = {
-    "type": "PLAN",
-    "details": {
-      "step_status": "STEP_RESULT",
-      "step_task": step.output if step.output else "No output"
-    }
-  }
-  # queue.put({"event": "step_result", "data": json.dumps(result)})
+  try:
+    queue.put(f"data: STEP_RESULT::{step.output if step.output else 'No output'}")
+  except Exception as e:
+    queue.put(f"data: Error::An error occurred after step end")
+    queue.put(None)
 
 def on_plan_end(plan: Plan, plan_run: PlanRun, output) -> None:
-  if plan_run.outputs.final_output:
-    final = {
-      "type": "ANSWER",
-      "details": plan_run.outputs.final_output
-    }
-    # queue.put({"event": "final_output", "data": json.dumps(final)})
-  queue.put(None)  # sentinel to signal completion
+  
+  try:
+    if plan_run.outputs:
+      final_output = plan_run.outputs
+      queue.put(f"data: ANSWER::{final_output.model_dump_json()}")
+      
+    queue.put(None)  # signal completion
+  except Exception as e:
+    queue.put(f"data: Error::An error occurred after plan end")
+    queue.put(None)
 
 class WebClarificationHandler(ClarificationHandler):
   """Handles clarification by getting user actions from the web"""
