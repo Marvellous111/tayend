@@ -103,7 +103,7 @@ async def createTask(request: Request, body: TaskBody):
         get_tasks = tasks_collection.find()
         print(get_tasks)
         gotten_tasks = []
-        for task in get_tasks:
+        async for task in get_tasks:
             gotten_tasks.append(task_helper(task))
         print(gotten_tasks)
         print(f"Task added with id: {sendtask.inserted_id}")
@@ -127,7 +127,7 @@ async def stream_steps(request: Request, username: str):
         # So we are basically going to get the collections based on the user name
         get_tasks = task_collection.find({ "username": username })
         gotten_tasks = []
-        for task in get_tasks:
+        async for task in get_tasks:
             gotten_tasks.append(task_helper(task))
             
         return {
