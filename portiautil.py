@@ -140,7 +140,7 @@ def after_clarify_tool(
   step: Step,
   ) -> Clarification | None:
   try:
-    queue.put(f"data: CLARIFICATION_END::Resolved clarification")
+    queue.put(f"data: CLARIFICATION_END::Resolved clarification\n\n")
     clarifications_list = [] # we want to refresh clarifications list here
     pasued_plan_run_list = [] # Refresh plan run here
   except Exception as e:
