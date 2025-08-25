@@ -123,11 +123,11 @@ def before_clarify_tools(
           }
           # clarifications_list.append(clarification)
           queue.put(f"data: CLARIFICATION::{json.dumps(clarification_dict)}\n\n")
-          #queue.put(None) # We want to stop sending server events here right??
+          
           
         print("ADDED A CLARIFICATION TO QUEUE AND PAUSING TO RERUN LATER")
-          
         paused_run = portia.wait_for_ready(plan_run)
+        queue.put(None) # We want to stop sending server events here right??
         fillpausedplanrunlist(paused_run)
         #paused_plan_run_list = [new_plan_run]
           
@@ -153,9 +153,6 @@ def after_clarify_tool(
     for resolved_clarifications in plan_run_clarifications:
       if resolved_clarifications or resolved_clarifications.resolved: 
         queue.put(f"data: CLARIFICATION_END::Resolved clarification")
-    #clarifications_list = [] # we want to refresh clarifications list here
-    #pasued_plan_run_list = [] # Refresh plan 
-    plan_run = portia.resume(plan_run)
   except Exception as e:
     queue.put(f"data: Error::An error occurred after plan end\n\n")
     queue.put(None)

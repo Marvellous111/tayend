@@ -104,6 +104,7 @@ async def async_stream_continue(plan_run: PlanRun):
     while True:
         item = await asyncio.to_thread(queue.get)
         if item is None:
+            print("BREAKING SERVER ASYNC STREAM")
             break
         yield item
     plan_run_thread.join()
