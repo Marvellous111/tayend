@@ -86,9 +86,9 @@ def before_plan(plan: Plan, plan_run: PlanRun) -> None:
           
         queue.put(f"data: CLARIFICATION::{json.dumps(clarification_dict)}\n\n")
         print("ADDED A CLARIFICATION TO QUEUE AND PAUSING TO RERUN LATER")
-      paused_run = portia.wait_for_ready(plan_run)
+      # paused_run = portia.wait_for_ready(plan_run)
       # queue.put(None)
-      fillpausedplanrunlist(paused_run)
+      # fillpausedplanrunlist(paused_run)
   except Exception as e:
     queue.put(f"data: Error::An error occurred before plan start\n\n")
     queue.put(None)
@@ -177,9 +177,9 @@ def before_clarify_tools(
             
             
           print("ADDED A CLARIFICATION TO QUEUE AND PAUSING TO RERUN LATER")
-          paused_run = portia.wait_for_ready(plan_run)
-          queue.put(None) # We want to stop sending server events here right??
-          fillpausedplanrunlist(paused_run)
+          # paused_run = portia.wait_for_ready(plan_run)
+          # queue.put(None) # We want to stop sending server events here right??
+          # fillpausedplanrunlist(paused_run)
           #paused_plan_run_list = [new_plan_run]
             
           return clarification
