@@ -1,21 +1,23 @@
 import os
 from dotenv import load_dotenv
-from typing import Callable, Dict
+from typing import Callable, Dict, Any
 import asyncio
 from queue import Queue
 from uuid import uuid4
 from portia import (
-  Config,LLMProvider,Plan,PlanRun,PortiaToolRegistry,Step, Output,
+  Config,LLMProvider,Plan,PlanRun,PortiaToolRegistry,Step, Output, Tool, ToolHardError,
   InMemoryToolRegistry,DefaultToolRegistry,LLMTool,Portia,StorageClass,LogLevel,
   open_source_tool_registry,example_tool_registry,MultipleChoiceClarification,ActionClarification,InputClarification,
-  ValueConfirmationClarification,PlanRunState,ClarificationHandler, ExecutionHooks,Clarification,
+  ValueConfirmationClarification,PlanRunState,ClarificationHandler, ExecutionHooks,Clarification, UserVerificationClarification
 )
 from portia.cli import CLIExecutionHooks
 import json
 import threading
 
 #In-memory store for the clarifications to save to the classifications handler
-clarifications_list = []
+clarifications_list = [] ## This will store the classification we will use for verification
+new_plan_run: PlanRun | None = None
+paused_plan_run_list = []
 queue = Queue()
 def on_step_start(plan: Plan, plan_run: PlanRun, step: Step) -> None:  # noqa: ARG001
   try:
@@ -37,6 +39,110 @@ def on_plan_end(plan: Plan, plan_run: PlanRun, output) -> None:
     print(final_output)
     queue.put(f"data: ANSWER::{final_output.model_dump_json()}\n\n")
     queue.put(None)  # signal completion
+  except Exception as e:
+    queue.put(f"data: Error::An error occurred after plan end\n\n")
+    queue.put(None)
+    
+###Clarification | InputClarification | ActionClarification | MultipleChoiceClarification | ValueConfirmationClarification | UserVerificationClarification
+    
+def before_clarify_tools(
+  tool: Tool,
+  args: dict[str, Any],
+  plan_run: PlanRun,
+  step: Step
+  ) -> Clarification | None:
+  try:
+    previous_clarification = plan_run.get_clarifications_for_step()
+    
+    for clarification in previous_clarification:
+      if not clarification or not clarification.resolved:
+        if isinstance(clarification, ActionClarification):
+          clarification_dict = {
+            "uuid": clarification.id,
+            "plan_run_id":plan_run.id,
+            "category": clarification.category,
+            "step": clarification.step,
+            "user_guidance": clarification.user_guidance,
+            "resolved": clarification.resolved,
+            "action_url": clarification.action_url,
+          }
+          clarifications_list.append(clarification)
+          queue.put(f"data: CLARIFICATION::{json.dumps(clarification_dict)}\n\n")
+        elif isinstance(clarification, InputClarification):
+          clarification_dict = {
+            "uuid": clarification.id,
+            "plan_run_id":plan_run.id,
+            "category": clarification.category,
+            "step": clarification.step,
+            "user_guidance": clarification.user_guidance,
+            "resolved": clarification.resolved,
+            "argument": clarification.argument_name,
+          }
+          clarifications_list.append(clarification)
+          queue.put(f"data: CLARIFICATION::{json.dumps(clarification_dict)}\n\n")
+        elif isinstance(clarification, MultipleChoiceClarification):
+          clarification_dict = {
+            "uuid": clarification.id,
+            "plan_run_id":plan_run.id,
+            "category": clarification.category,
+            "step": clarification.step,
+            "user_guidance": clarification.user_guidance,
+            "resolved": clarification.resolved,
+            "argument": clarification.argument_name,
+            "response": clarification.response,
+            "options": clarification.options
+          }
+          clarifications_list.append(clarification)
+          queue.put(f"data: CLARIFICATION::{json.dumps(clarification_dict)}\n\n")
+        elif isinstance(clarification, ValueConfirmationClarification):
+          clarification_dict = {
+            "uuid": clarification.id,
+            "plan_run_id":plan_run.id,
+            "category": clarification.category,
+            "step": clarification.step,
+            "user_guidance": clarification.user_guidance,
+            "resolved": clarification.resolved,
+            "argument": clarification.argument_name,
+            "response": clarification.response,
+          }
+          clarifications_list.append(clarification)
+          queue.put(f"data: CLARIFICATION::{json.dumps(clarification_dict)}\n\n")
+        elif isinstance(clarification, UserVerificationClarification):
+          clarification_dict = {
+            "uuid": clarification.id,
+            "plan_run_id":plan_run.id,
+            "category": clarification.category,
+            "step": clarification.step,
+            "user_guidance": clarification.user_guidance,
+            "resolved": clarification.resolved,
+            "response": clarification.response,
+            "question": ["yes", "no"]
+          }
+          clarifications_list.append(clarification)
+          queue.put(f"data: CLARIFICATION::{json.dumps(clarification_dict)}\n\n")
+          
+          new_plan_run = portia.wait_for_ready(plan_run)
+          paused_plan_run_list = [new_plan_run]
+      
+      if clarification.response == None:
+        raise ToolHardError(f"User rejected tool call to {tool.name} with args {args}")
+      
+      return None
+  except Exception as e:
+    queue.put(f"data: Error::An error occurred after plan end\n\n")
+    queue.put(None)
+
+
+def after_clarify_tool(
+  tool: Tool,
+  args: dict[str, Any],
+  plan_run: PlanRun,
+  step: Step,
+  ) -> Clarification | None:
+  try:
+    queue.put(f"data: CLARIFICATION_END::Resolved clarification")
+    clarifications_list = [] # we want to refresh clarifications list here
+    pasued_plan_run_list = [] # Refresh plan run here
   except Exception as e:
     queue.put(f"data: Error::An error occurred after plan end\n\n")
     queue.put(None)
@@ -104,6 +210,8 @@ portia = Portia(
     before_step_execution=on_step_start, # type: ignore
     after_step_execution=on_step_end, # type: ignore
     after_plan_run=on_plan_end, # type: ignore
+    before_tool_call=before_clarify_tools,
+    after_tool_call=after_clarify_tool,
     clarification_handler=WebClarificationHandler()
   )
 )

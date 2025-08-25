@@ -63,6 +63,16 @@ async def async_stream(plan: Plan, username: str):
             break
         yield item
     plan_thread.join()
+    
+async def async_stream_continue(plan_run: PlanRun):
+    plan_run_thread = threading.Thread(target=resumeplanrun, args=(plan_run))
+    plan_run_thread.start()
+    while True:
+        item = await asyncio.to_thread(queue.get)
+        if item is None:
+            break
+        yield item
+    plan_run_thread.join()
 
 query_plan = {}
 @app.post("/postquery/")
@@ -91,6 +101,36 @@ async def stream_query(username: str):
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
     )
+
+def resumeplanrun(paused_plan_run: PlanRun):
+    plan_run = portia.resume(paused_plan_run)
+    return plan_run
+
+gotten_plan_run: PlanRun | None = None
+
+@app.post("/postquery/clarifications")
+async def resolveclarifications(body: ClassificationAnswer):
+    print(body)
+    unresolved = clarifications_list[0]
+    unresolved_plan_run_list = paused_plan_run_list[0]
+    if body.category:
+        if body.answer:
+            gotten_plan_run = portia.resolve_clarification(unresolved, body.answer, unresolved_plan_run_list)
+    
+    # Here we will have to resume since plan is paused for us in hook
+    
+@app.get("/postquery/clarifications/stream/{username}")
+async def continuestreaming(request: Request):
+    if gotten_plan_run is not None:
+        return StreamingResponse(
+            async_stream_continue(gotten_plan_run),
+            media_type="text/event-stream",
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
+        )
+    else:
+        print(f"Error adding task")
+        raise HTTPException(status_code=500, detail="Cannot continue stream")
+    
 
 ###We want to use this to save the task to a mongodb instance with the username right?
 ###Hence we can use the username to get the task from the database

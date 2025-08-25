@@ -27,3 +27,8 @@ class TaskBodyDict(TypedDict):
   time: str
   weekday: str
   actions_taken: list
+  
+class ClassificationAnswer(BaseModel):
+  id: str
+  category: str
+  answer: str
