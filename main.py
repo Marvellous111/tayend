@@ -30,8 +30,8 @@ crons = Crons(app)
 app.include_router(get_cron_router())
 
 # Global dict for pending plan_runs and clarifications, with lock for thread safety
-pending_plan_runs: Dict[str, 'PlanRun'] = {}
-pending_clarifications: Dict[str, Dict] = {}
+# pending_plan_runs: Dict[str, 'PlanRun'] = {}
+# pending_clarifications: Dict[str, Dict] = {}
 # lock = Lock()
 
 
@@ -60,19 +60,11 @@ async def async_stream(plan: Plan, username: str):
         # Use asyncio.to_thread to non-blockingly get from queue
         item = await asyncio.to_thread(queue.get)
         if item is None:
+            print("BREAKING SERVER ASYNC STREAM")
             break
         yield item
     plan_thread.join()
     
-async def async_stream_continue(plan_run: PlanRun):
-    plan_run_thread = threading.Thread(target=resumeplanrun, args=(plan_run))
-    plan_run_thread.start()
-    while True:
-        item = await asyncio.to_thread(queue.get)
-        if item is None:
-            break
-        yield item
-    plan_run_thread.join()
 
 query_plan = {}
 @app.post("/postquery/")
@@ -83,16 +75,7 @@ async def postquery(request: Request, body: BodyQuery):
     query_plan[str(body.username)] = plan
     
     return {"message": "Started plan_run"}
-    # return StreamingResponse(
-    #     async_stream(plan, body.username),
-    #     media_type="text/event-stream",
-    #     headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
-    # )
-    # output_str = output.model_dump()
-    # print(f"Final plan_run output is: {output_str}")
-    # return {
-    #     "message": output_str
-    # }
+
 @app.get("/postquery/stream/{username}")
 async def stream_query(username: str):
     plan = query_plan.get(username, [])  # Retrieve plan
@@ -106,30 +89,33 @@ def resumeplanrun(paused_plan_run: PlanRun):
     plan_run = portia.resume(paused_plan_run)
     return plan_run
 
-gotten_plan_run: PlanRun | None = None
-
-@app.post("/postquery/clarifications")
+@app.post("/postquery/clarifications/")
 async def resolveclarifications(body: ClassificationAnswer):
     print(body)
-    unresolved = clarifications_list[0]
-    unresolved_plan_run_list = paused_plan_run_list[0]
-    if body.category:
-        if body.answer:
-            gotten_plan_run = portia.resolve_clarification(unresolved, body.answer, unresolved_plan_run_list)
+    # unresolved = clarifications_list[0]
+    # unresolved_plan_run_list = paused_plan_run_list[0]
+    fillresolutionlist(body.answer)
     
     # Here we will have to resume since plan is paused for us in hook
     
+async def async_stream_continue(plan_run: PlanRun):
+    plan_run_thread = threading.Thread(target=resumeplanrun, args=(plan_run))
+    plan_run_thread.start()
+    while True:
+        item = await asyncio.to_thread(queue.get)
+        if item is None:
+            break
+        yield item
+    plan_run_thread.join()
+    
 @app.get("/postquery/clarifications/stream/{username}")
 async def continuestreaming(request: Request):
-    if gotten_plan_run is not None:
-        return StreamingResponse(
-            async_stream_continue(gotten_plan_run),
-            media_type="text/event-stream",
-            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
-        )
-    else:
-        print(f"Error adding task")
-        raise HTTPException(status_code=500, detail="Cannot continue stream")
+    paused_run = getpausedplanrunlist()
+    return StreamingResponse(
+        async_stream_continue(paused_run[0]),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
+    )
     
 
 ###We want to use this to save the task to a mongodb instance with the username right?

@@ -3,6 +3,7 @@ from dotenv import load_dotenv
 from typing import Callable, Dict, Any
 import asyncio
 from queue import Queue
+from bodyquery import *
 from uuid import uuid4
 from portia import (
   Config,LLMProvider,Plan,PlanRun,PortiaToolRegistry,Step, Output, Tool, ToolHardError,
@@ -15,9 +16,9 @@ import json
 import threading
 
 #In-memory store for the clarifications to save to the classifications handler
-clarifications_list = [] ## This will store the classification we will use for verification
-new_plan_run: PlanRun | None = None
-paused_plan_run_list = []
+#clarifications_list = [] ## This will store the classification we will use for verification
+# new_plan_run: PlanRun | None = None
+#paused_plan_run_list = []
 queue = Queue()
 def on_step_start(plan: Plan, plan_run: PlanRun, step: Step) -> None:  # noqa: ARG001
   try:
@@ -54,6 +55,8 @@ def before_clarify_tools(
   try:
     previous_clarification = plan_run.get_clarifications_for_step()
     
+    print(previous_clarification)
+    
     for clarification in previous_clarification:
       if not clarification or not clarification.resolved:
         if isinstance(clarification, ActionClarification):
@@ -66,7 +69,7 @@ def before_clarify_tools(
             "resolved": clarification.resolved,
             "action_url": clarification.action_url,
           }
-          clarifications_list.append(clarification)
+          # clarifications_list.append(clarification)
           queue.put(f"data: CLARIFICATION::{json.dumps(clarification_dict)}\n\n")
         elif isinstance(clarification, InputClarification):
           clarification_dict = {
@@ -78,7 +81,7 @@ def before_clarify_tools(
             "resolved": clarification.resolved,
             "argument": clarification.argument_name,
           }
-          clarifications_list.append(clarification)
+          # clarifications_list.append(clarification)
           queue.put(f"data: CLARIFICATION::{json.dumps(clarification_dict)}\n\n")
         elif isinstance(clarification, MultipleChoiceClarification):
           clarification_dict = {
@@ -92,7 +95,7 @@ def before_clarify_tools(
             "response": clarification.response,
             "options": clarification.options
           }
-          clarifications_list.append(clarification)
+          # clarifications_list.append(clarification)
           queue.put(f"data: CLARIFICATION::{json.dumps(clarification_dict)}\n\n")
         elif isinstance(clarification, ValueConfirmationClarification):
           clarification_dict = {
@@ -105,7 +108,7 @@ def before_clarify_tools(
             "argument": clarification.argument_name,
             "response": clarification.response,
           }
-          clarifications_list.append(clarification)
+          # clarifications_list.append(clarification)
           queue.put(f"data: CLARIFICATION::{json.dumps(clarification_dict)}\n\n")
         elif isinstance(clarification, UserVerificationClarification):
           clarification_dict = {
@@ -118,11 +121,17 @@ def before_clarify_tools(
             "response": clarification.response,
             "question": ["yes", "no"]
           }
-          clarifications_list.append(clarification)
+          # clarifications_list.append(clarification)
           queue.put(f"data: CLARIFICATION::{json.dumps(clarification_dict)}\n\n")
+          #queue.put(None) # We want to stop sending server events here right??
           
-          new_plan_run = portia.wait_for_ready(plan_run)
-          paused_plan_run_list = [new_plan_run]
+        print("ADDED A CLARIFICATION TO QUEUE AND PAUSING TO RERUN LATER")
+          
+        paused_run = portia.wait_for_ready(plan_run)
+        fillpausedplanrunlist(paused_run)
+        #paused_plan_run_list = [new_plan_run]
+          
+        return clarification
       
       if clarification.response == None:
         raise ToolHardError(f"User rejected tool call to {tool.name} with args {args}")
@@ -140,9 +149,13 @@ def after_clarify_tool(
   step: Step,
   ) -> Clarification | None:
   try:
-    queue.put(f"data: CLARIFICATION_END::Resolved clarification\n\n")
-    clarifications_list = [] # we want to refresh clarifications list here
-    pasued_plan_run_list = [] # Refresh plan run here
+    plan_run_clarifications = plan_run.get_clarifications_for_step()
+    for resolved_clarifications in plan_run_clarifications:
+      if resolved_clarifications or resolved_clarifications.resolved: 
+        queue.put(f"data: CLARIFICATION_END::Resolved clarification")
+    #clarifications_list = [] # we want to refresh clarifications list here
+    #pasued_plan_run_list = [] # Refresh plan 
+    plan_run = portia.resume(plan_run)
   except Exception as e:
     queue.put(f"data: Error::An error occurred after plan end\n\n")
     queue.put(None)
@@ -153,19 +166,15 @@ class WebClarificationHandler(ClarificationHandler):
     self,
     clarification: InputClarification,
     on_resolution: Callable[[Clarification, object], None],
-    on_error: Callable[[Clarification, object], None],  # noqa: ARG002
+    on_error: Callable[[Clarification, object], None],
   ) -> None:
-    """Handle a user input clarifications by asking the user for input from the CLI."""
-    user_input = input(f"{clarification.user_guidance}\nPlease enter a value:\n")
+    """Get the input from the web and process it here"""
     
-    # clarification_obj = {
-    #   "type": "INPUT",
-    #   "clarification_uuid": clarification.uuid,
-    #   "plan_id": clarification.plan_run_id,
-    #   "response": "",
-    # }
-    clarifications_list.append(clarification)
-    on_resolution(clarification, user_input)
+    get_resolved = getresolutionlist()
+    
+    on_resolution(clarification, get_resolved[0])    
+    queue.put(f"data: STEP_RESULT::Input clarification resolved\n\n")
+    emptyresolutionlist()
     
   def handle_action_clarification(
     self,
@@ -173,7 +182,10 @@ class WebClarificationHandler(ClarificationHandler):
     on_resolution: Callable[[Clarification, object], None],
     on_error: Callable[[Clarification, object], None]
     ) -> None:
-    return super().handle_action_clarification(clarification, on_resolution, on_error)
+    get_resolved = getresolutionlist()
+    on_resolution(clarification, get_resolved[0])
+    queue.put(f"data: STEP_RESULT::Action clarification resolved\n\n") 
+    emptyresolutionlist()
   
   def handle_value_confirmation_clarification(
     self,
@@ -181,7 +193,10 @@ class WebClarificationHandler(ClarificationHandler):
     on_resolution: Callable[[Clarification, object], None],
     on_error: Callable[[Clarification, object], None]
   ) -> None:
-    return super().handle_value_confirmation_clarification(clarification, on_resolution, on_error)
+    get_resolved = getresolutionlist()
+    on_resolution(clarification, get_resolved[0])
+    queue.put(f"data: STEP_RESULT::Action clarification resolved\n\n") 
+    emptyresolutionlist()
   
   def handle_multiple_choice_clarification(
     self,
@@ -189,7 +204,10 @@ class WebClarificationHandler(ClarificationHandler):
     on_resolution: Callable[[Clarification, object], None],
     on_error: Callable[[Clarification, object], None]
   ) -> None:
-    return super().handle_multiple_choice_clarification(clarification, on_resolution, on_error)
+    get_resolved = getresolutionlist()
+    on_resolution(clarification, get_resolved[0])
+    queue.put(f"data: STEP_RESULT::Action clarification resolved\n\n") 
+    emptyresolutionlist()
 
 
 load_dotenv()
