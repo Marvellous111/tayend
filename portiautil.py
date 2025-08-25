@@ -86,9 +86,9 @@ def before_plan(plan: Plan, plan_run: PlanRun) -> None:
           
         queue.put(f"data: CLARIFICATION::{json.dumps(clarification_dict)}\n\n")
         print("ADDED A CLARIFICATION TO QUEUE AND PAUSING TO RERUN LATER")
-    paused_run = portia.wait_for_ready(plan_run)
-    queue.put(None)
-    fillpausedplanrunlist(paused_run)
+      paused_run = portia.wait_for_ready(plan_run)
+      # queue.put(None)
+      fillpausedplanrunlist(paused_run)
   except Exception as e:
     queue.put(f"data: Error::An error occurred before plan start\n\n")
     queue.put(None)
@@ -107,85 +107,86 @@ def before_clarify_tools(
     
     print(previous_clarification)
     
-    for clarification in previous_clarification:
-      if not clarification or not clarification.resolved:
-        if isinstance(clarification, ActionClarification):
-          clarification_dict = {
-            "uuid": clarification.id,
-            "plan_run_id":plan_run.id,
-            "category": clarification.category,
-            "step": clarification.step,
-            "user_guidance": clarification.user_guidance,
-            "resolved": clarification.resolved,
-            "action_url": clarification.action_url,
-          }
-          # clarifications_list.append(clarification)
-          queue.put(f"data: CLARIFICATION::{json.dumps(clarification_dict)}\n\n")
-        elif isinstance(clarification, InputClarification):
-          clarification_dict = {
-            "uuid": clarification.id,
-            "plan_run_id":plan_run.id,
-            "category": clarification.category,
-            "step": clarification.step,
-            "user_guidance": clarification.user_guidance,
-            "resolved": clarification.resolved,
-            "argument": clarification.argument_name,
-          }
-          # clarifications_list.append(clarification)
-          queue.put(f"data: CLARIFICATION::{json.dumps(clarification_dict)}\n\n")
-        elif isinstance(clarification, MultipleChoiceClarification):
-          clarification_dict = {
-            "uuid": clarification.id,
-            "plan_run_id":plan_run.id,
-            "category": clarification.category,
-            "step": clarification.step,
-            "user_guidance": clarification.user_guidance,
-            "resolved": clarification.resolved,
-            "argument": clarification.argument_name,
-            "response": clarification.response,
-            "options": clarification.options
-          }
-          # clarifications_list.append(clarification)
-          queue.put(f"data: CLARIFICATION::{json.dumps(clarification_dict)}\n\n")
-        elif isinstance(clarification, ValueConfirmationClarification):
-          clarification_dict = {
-            "uuid": clarification.id,
-            "plan_run_id":plan_run.id,
-            "category": clarification.category,
-            "step": clarification.step,
-            "user_guidance": clarification.user_guidance,
-            "resolved": clarification.resolved,
-            "argument": clarification.argument_name,
-            "response": clarification.response,
-          }
-          # clarifications_list.append(clarification)
-          queue.put(f"data: CLARIFICATION::{json.dumps(clarification_dict)}\n\n")
-        elif isinstance(clarification, UserVerificationClarification):
-          clarification_dict = {
-            "uuid": clarification.id,
-            "plan_run_id":plan_run.id,
-            "category": clarification.category,
-            "step": clarification.step,
-            "user_guidance": clarification.user_guidance,
-            "resolved": clarification.resolved,
-            "response": clarification.response,
-            "question": ["yes", "no"]
-          }
-          # clarifications_list.append(clarification)
-          queue.put(f"data: CLARIFICATION::{json.dumps(clarification_dict)}\n\n")
-          
-          
-        print("ADDED A CLARIFICATION TO QUEUE AND PAUSING TO RERUN LATER")
-        paused_run = portia.wait_for_ready(plan_run)
-        queue.put(None) # We want to stop sending server events here right??
-        fillpausedplanrunlist(paused_run)
-        #paused_plan_run_list = [new_plan_run]
-          
-        return clarification
-      
-      if clarification.response == None:
-        raise ToolHardError(f"User rejected tool call to {tool.name} with args {args}")
-      
+    if len(previous_clarification) > 0:
+      for clarification in previous_clarification:
+        if not clarification or not clarification.resolved:
+          if isinstance(clarification, ActionClarification):
+            clarification_dict = {
+              "uuid": clarification.id,
+              "plan_run_id":plan_run.id,
+              "category": clarification.category,
+              "step": clarification.step,
+              "user_guidance": clarification.user_guidance,
+              "resolved": clarification.resolved,
+              "action_url": clarification.action_url,
+            }
+            # clarifications_list.append(clarification)
+            queue.put(f"data: CLARIFICATION::{json.dumps(clarification_dict)}\n\n")
+          elif isinstance(clarification, InputClarification):
+            clarification_dict = {
+              "uuid": clarification.id,
+              "plan_run_id":plan_run.id,
+              "category": clarification.category,
+              "step": clarification.step,
+              "user_guidance": clarification.user_guidance,
+              "resolved": clarification.resolved,
+              "argument": clarification.argument_name,
+            }
+            # clarifications_list.append(clarification)
+            queue.put(f"data: CLARIFICATION::{json.dumps(clarification_dict)}\n\n")
+          elif isinstance(clarification, MultipleChoiceClarification):
+            clarification_dict = {
+              "uuid": clarification.id,
+              "plan_run_id":plan_run.id,
+              "category": clarification.category,
+              "step": clarification.step,
+              "user_guidance": clarification.user_guidance,
+              "resolved": clarification.resolved,
+              "argument": clarification.argument_name,
+              "response": clarification.response,
+              "options": clarification.options
+            }
+            # clarifications_list.append(clarification)
+            queue.put(f"data: CLARIFICATION::{json.dumps(clarification_dict)}\n\n")
+          elif isinstance(clarification, ValueConfirmationClarification):
+            clarification_dict = {
+              "uuid": clarification.id,
+              "plan_run_id":plan_run.id,
+              "category": clarification.category,
+              "step": clarification.step,
+              "user_guidance": clarification.user_guidance,
+              "resolved": clarification.resolved,
+              "argument": clarification.argument_name,
+              "response": clarification.response,
+            }
+            # clarifications_list.append(clarification)
+            queue.put(f"data: CLARIFICATION::{json.dumps(clarification_dict)}\n\n")
+          elif isinstance(clarification, UserVerificationClarification):
+            clarification_dict = {
+              "uuid": clarification.id,
+              "plan_run_id":plan_run.id,
+              "category": clarification.category,
+              "step": clarification.step,
+              "user_guidance": clarification.user_guidance,
+              "resolved": clarification.resolved,
+              "response": clarification.response,
+              "question": ["yes", "no"]
+            }
+            # clarifications_list.append(clarification)
+            queue.put(f"data: CLARIFICATION::{json.dumps(clarification_dict)}\n\n")
+            
+            
+          print("ADDED A CLARIFICATION TO QUEUE AND PAUSING TO RERUN LATER")
+          paused_run = portia.wait_for_ready(plan_run)
+          queue.put(None) # We want to stop sending server events here right??
+          fillpausedplanrunlist(paused_run)
+          #paused_plan_run_list = [new_plan_run]
+            
+          return clarification
+        
+        if clarification.response == None:
+          raise ToolHardError(f"User rejected tool call to {tool.name} with args {args}")
+    else:
       return None
   except Exception as e:
     queue.put(f"data: Error::An error occurred after plan end\n\n")
@@ -229,6 +230,7 @@ class WebClarificationHandler(ClarificationHandler):
     on_resolution: Callable[[Clarification, object], None],
     on_error: Callable[[Clarification, object], None]
     ) -> None:
+    print("ACTION CLARIFICATION CALLED")
     get_resolved = getresolutionlist()
     on_resolution(clarification, get_resolved[0])
     queue.put(f"data: STEP_RESULT::Action clarification resolved\n\n") 

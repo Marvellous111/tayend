@@ -73,7 +73,6 @@ async def postquery(request: Request, body: BodyQuery):
     """Stream the steps to the users"""
     plan = createplan(str(body.query))
     query_plan[str(body.username)] = plan
-    print(plan)
     return {"message": "Started plan_run"}
 
 @app.get("/postquery/stream/{username}")
