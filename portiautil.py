@@ -22,6 +22,14 @@ import threading
 queue = Queue()
 def on_step_start(plan: Plan, plan_run: PlanRun, step: Step) -> None:  # noqa: ARG001
   try:
+    previous_clarification = plan_run.get_clarifications_for_step()
+    for previous in previous_clarification:
+      if not previous or not previous.resolved:
+        print("STEP START WITH UNRESOLVED CLARIFICATION, SKIPPING STEP START EVENT")
+        # print("ADDED A CLARIFICATION TO QUEUE AND PAUSING TO RERUN LATER")
+        # paused_run = portia.wait_for_ready(plan_run)
+        # queue.put(None) # We want to stop sending server events here right??
+        # fillpausedplanrunlist(paused_run)
     queue.put(f"data: STEP_START::{step.task}\n\n")
   except Exception as e:
     queue.put(f"data: Error::An error occurred before step start\n\n")
