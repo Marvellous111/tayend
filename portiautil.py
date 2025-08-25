@@ -53,6 +53,47 @@ def on_plan_end(plan: Plan, plan_run: PlanRun, output) -> None:
     queue.put(None)
     
 ###Clarification | InputClarification | ActionClarification | MultipleChoiceClarification | ValueConfirmationClarification | UserVerificationClarification
+   
+def before_plan(plan: Plan, plan_run: PlanRun) -> None:
+  try:
+    print("BEFORE THE PLAN IS RUN THERE MAY BE A CLARIFICATION HERE TO RESOLVE")
+    if plan_run.state == PlanRunState.NEED_CLARIFICATION:
+      for clarification in plan_run.get_outstanding_clarifications():
+        print("Plan run needs clarification:", clarification)
+        clarification_dict = {
+          "uuid": clarification.id,
+          "plan_run_id":plan_run.id,
+          "category": clarification.category,
+          "step": clarification.step,
+          "user_guidance": clarification.user_guidance,
+          "resolved": clarification.resolved,
+          "response": clarification.response,
+        }
+        if isinstance(clarification, ActionClarification):
+          clarification_dict["action_url"] = clarification.action_url
+        if isinstance(clarification, InputClarification):
+          clarification_dict["argument"] = clarification.argument_name
+        if isinstance(clarification, MultipleChoiceClarification):
+          clarification_dict["argument"] = clarification.argument_name
+          clarification_dict["response"] = clarification.response
+          clarification_dict["options"] = clarification.options
+        if isinstance(clarification, ValueConfirmationClarification):
+          clarification_dict["argument"] = clarification.argument_name
+          clarification_dict["response"] = clarification.response
+        if isinstance(clarification, UserVerificationClarification):
+          clarification_dict["response"] = clarification.response
+          clarification_dict["question"] = ["yes", "no"]
+          
+        queue.put(f"data: CLARIFICATION::{json.dumps(clarification_dict)}\n\n")
+        print("ADDED A CLARIFICATION TO QUEUE AND PAUSING TO RERUN LATER")
+    paused_run = portia.wait_for_ready(plan_run)
+    queue.put(None)
+    fillpausedplanrunlist(paused_run)
+  except Exception as e:
+    queue.put(f"data: Error::An error occurred before plan start\n\n")
+    queue.put(None)
+    
+    
     
 def before_clarify_tools(
   tool: Tool,
@@ -61,6 +102,7 @@ def before_clarify_tools(
   step: Step
   ) -> Clarification | None:
   try:
+    print("TRY TOOL CALL")
     previous_clarification = plan_run.get_clarifications_for_step()
     
     print(previous_clarification)
@@ -232,6 +274,7 @@ portia = Portia(
   execution_hooks=ExecutionHooks(
     before_step_execution=on_step_start, # type: ignore
     after_step_execution=on_step_end, # type: ignore
+    before_plan_run=before_plan,
     after_plan_run=on_plan_end, # type: ignore
     before_tool_call=before_clarify_tools,
     after_tool_call=after_clarify_tool,
@@ -256,38 +299,6 @@ def createplan(task: str) -> Plan:
 
 def runplan(plan: Plan, username: str) -> PlanRun:
   plan_run = portia.run_plan(plan, end_user=f"{username}")
-  if plan_run.state == PlanRunState.NEED_CLARIFICATION:
-    for clarification in plan_run.get_outstanding_clarifications():
-      print("Plan run needs clarification:", clarification)
-      clarification_dict = {
-        "uuid": clarification.id,
-        "plan_run_id":plan_run.id,
-        "category": clarification.category,
-        "step": clarification.step,
-        "user_guidance": clarification.user_guidance,
-        "resolved": clarification.resolved,
-        "response": clarification.response,
-      }
-      if isinstance(clarification, ActionClarification):
-        clarification_dict["action_url"] = clarification.action_url
-      if isinstance(clarification, InputClarification):
-        clarification_dict["argument"] = clarification.argument_name
-      if isinstance(clarification, MultipleChoiceClarification):
-        clarification_dict["argument"] = clarification.argument_name
-        clarification_dict["response"] = clarification.response
-        clarification_dict["options"] = clarification.options
-      if isinstance(clarification, ValueConfirmationClarification):
-        clarification_dict["argument"] = clarification.argument_name
-        clarification_dict["response"] = clarification.response
-      if isinstance(clarification, UserVerificationClarification):
-        clarification_dict["response"] = clarification.response
-        clarification_dict["question"] = ["yes", "no"]
-        
-      queue.put(f"data: CLARIFICATION::{json.dumps(clarification_dict)}\n\n")
-      print("ADDED A CLARIFICATION TO QUEUE AND PAUSING TO RERUN LATER")
-    paused_run = portia.wait_for_ready(plan_run)
-    queue.put(None)
-    fillpausedplanrunlist(paused_run)
   return plan_run
 
 
